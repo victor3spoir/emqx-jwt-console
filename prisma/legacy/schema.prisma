@@ -1,0 +1,121 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id            String    @id
+  name          String
+  email         String    @unique
+  emailVerified Boolean   @default(false)
+  image         String?
+  createdAt     DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt     DateTime  @updatedAt @db.Timestamptz(6)
+  role          String?   @default("user")
+  banned        Boolean?  @default(false)
+  banReason     String?
+  banExpires    DateTime? @db.Timestamptz(6)
+  sessions      Session[]
+  accounts      Account[]
+
+  @@map("users")
+}
+
+model Session {
+  id             String   @id
+  expiresAt      DateTime @db.Timestamptz(6)
+  token          String   @unique
+  createdAt      DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @db.Timestamptz(6)
+  ipAddress      String?
+  userAgent      String?
+  userId         String
+  impersonatedBy String?
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime? @db.Timestamptz(6)
+  refreshTokenExpiresAt DateTime? @db.Timestamptz(6)
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt             DateTime  @updatedAt @db.Timestamptz(6)
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([providerId, accountId])
+  @@index([userId])
+  @@map("accounts")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime @db.Timestamptz(6)
+  createdAt  DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt  DateTime @updatedAt @db.Timestamptz(6)
+
+  @@index([identifier])
+  @@map("verifications")
+}
+
+model RateLimit {
+  id          String @id
+  key         String @unique
+  count       Int
+  lastRequest BigInt
+
+  @@map("rate_limits")
+}
+
+enum DeviceStatus {
+  active
+  disabled
+  revoked
+}
+
+model Device {
+  id                String       @id @default(uuid()) @db.Uuid
+  deviceId          String       @unique @map("device_id") @db.VarChar(100)
+  serialNumber      String       @unique @map("serial_number") @db.VarChar(100)
+  mqttUsername      String       @unique @map("mqtt_username") @db.VarChar(100)
+  deviceSecretHash  String       @map("device_secret_hash")
+  deviceSecret      String       @map("device_secret")
+  status            DeviceStatus @default(active)
+  firmwareVersion   String?      @map("firmware_version") @db.VarChar(50)
+  productModel      String?      @map("product_model") @db.VarChar(100)
+  createdAt         DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  lastTokenIssuedAt DateTime?    @map("last_token_issued_at") @db.Timestamptz(6)
+  revokedAt         DateTime?    @map("revoked_at") @db.Timestamptz(6)
+
+  @@index([status, createdAt])
+  @@map("devices")
+}
+
+model AuditEvent {
+  id         String   @id @default(uuid()) @db.Uuid
+  actorId    String?  @map("actor_id")
+  action     String
+  resourceId String?  @map("resource_id")
+  outcome    String
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([createdAt])
+  @@index([resourceId, createdAt])
+  @@map("audit_events")
+}

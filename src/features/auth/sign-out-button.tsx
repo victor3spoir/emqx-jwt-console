@@ -17,7 +17,9 @@ export function SignOutButton() {
 				onClick={async () => {
 					setPending(true);
 					try {
-						const result = await authClient.signOut();
+						const result = await authClient.signOut({
+							callbackURL: "/signin",
+						});
 						if (result.error) {
 							toast.error("Sign-out failed. Try again.");
 							setPending(false);

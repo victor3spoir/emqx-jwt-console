@@ -9,10 +9,28 @@ A single-organization device registry and JWT issuer for EMQX, with a protected 
 3. Copy `example.env` to `.env` and fill in the database URL and two separate random secrets. Generate each secret independently with `bun -e "console.log(require('node:crypto').randomBytes(48).toString('base64url'))"`.
 4. Run `docker compose up -d db` for local PostgreSQL on port 55432, or use your own PostgreSQL instance.
 5. Run `bun run db:generate` followed by `bun run db:deploy`.
-6. Set `BOOTSTRAP_ADMIN_EMAIL` and `BOOTSTRAP_ADMIN_PASSWORD` in your current shell, then run `bun run admin:bootstrap`. The password must have 12–128 characters. Optional: `BOOTSTRAP_ADMIN_NAME`. Remove those shell variables afterward. The command refuses to overwrite an account or create another bootstrap admin.
+6. With `NODE_ENV=development`, set `BOOTSTRAP_ADMIN_EMAIL` and `BOOTSTRAP_ADMIN_PASSWORD` in your current shell, then run `bun run admin:bootstrap`. The password must have 12–128 characters. Optional: `BOOTSTRAP_ADMIN_NAME`. Remove those shell variables afterward. The command refuses to run outside development, overwrite an account or create another bootstrap admin.
 7. Run `bun run dev` and open http://localhost:3000. Development applies pending database migrations before starting; development and production builds regenerate Prisma Client automatically.
 
-Public sign-up is disabled: `/signup` returns 404 and the authentication API rejects email/password registration. Accounts must be provisioned by a trusted administrator. To create an administrator with Better Auth's CLI, run `bunx auth@latest create-admin --config ./src/lib/auth.ts --email admin@example.com --name Administrator --role admin` and enter the password when prompted. Sign-in is at `/signin`; the console is at `/console/devices`. The console header includes a dark/light toggle. Its preference is stored in a non-sensitive cookie and applied during server rendering.
+Public sign-up is disabled. Email/password authentication and local administrator bootstrap exist only in development. Sign-in is at `/signin`; the console is at `/console/devices`. The console header includes a dark/light toggle. Its preference is stored in a non-sensitive cookie and applied during server rendering.
+
+## Keycloak authentication
+
+Production authentication uses a confidential Keycloak OpenID Connect client. Configure these runtime values:
+
+```dotenv
+KEYCLOAK_ISSUER=https://keycloak.example.com/realms/emqx
+KEYCLOAK_CLIENT_ID=emqx-device-console
+KEYCLOAK_CLIENT_SECRET=<secret-store-value>
+KEYCLOAK_ADMIN_ROLE=admin
+KEYCLOAK_ROLE_SOURCE=client
+```
+
+In Keycloak, enable the standard authorization-code flow, keep the client confidential, and allow PKCE with `S256`. Register `${BETTER_AUTH_URL}/api/auth/callback/keycloak` as a valid redirect URI and `${BETTER_AUTH_URL}` as a valid post-logout redirect URI and web origin. The `openid`, `profile`, and `email` scopes are requested. Keycloak must provide a verified email and include the configured administrator role in the ID token. With the default `KEYCLOAK_ROLE_SOURCE=client`, assign the `admin` client role on `emqx-device-console`; use `realm` only when the deployment deliberately uses a realm role.
+
+Keycloak identities without that role are authenticated but cannot enter `/console` or call its administrative APIs. OAuth tokens are encrypted in the database, automatic email-based account linking is disabled, and application sessions expire without rolling refresh after one hour so removed roles cannot remain cached indefinitely. Signing out also starts Keycloak logout when its discovery document publishes an end-session endpoint.
+
+The sign-in page reads its available methods from the server. In development, the Keycloak button remains visible but disabled until the three Keycloak server values are configured; no public build-time flag is required. Production requires complete HTTPS Keycloak configuration at startup and disables the password endpoint regardless of UI behavior.
 
 ## Devices
 
@@ -75,7 +93,7 @@ The request/response format is compatible with the sibling backend, but the defa
 
 ## Security and deployment
 
-Deploy one application instance behind a reverse proxy that terminates HTTPS. Production startup requires an HTTPS `BETTER_AUTH_URL`, `DATABASE_URL`, and distinct authentication/device signing secrets of at least 32 characters. Keep `.env` and provisioning secrets out of source control.
+Deploy one application instance behind a reverse proxy that terminates HTTPS. Production startup requires HTTPS `BETTER_AUTH_URL` and `KEYCLOAK_ISSUER` values, complete Keycloak client configuration, `DATABASE_URL`, and distinct authentication/device signing secrets of at least 32 characters. Keep `.env`, the Keycloak client secret and provisioning secrets out of source control.
 
 Build with `bun run db:generate` and `bun run build`. Apply migrations with `bun run db:deploy`, then start with `node .output/server/index.mjs`. Supply environment variables at runtime through your deployment's secret store; the built server does not depend on a checked-in `.env`. Set `PORT` for the private listener.
 
@@ -85,7 +103,7 @@ Device issuance has an application-wide limit of 600 requests/minute and a per-d
 
 The browser console uses protected oRPC procedures at `/api/rpc`. Every device procedure checks the current server-side admin role, independently of page navigation. Cookie-authenticated RPC writes require the configured browser origin. Starter Todo and MCP endpoints have been removed.
 
-Email delivery, password reset, MFA, organization management and broker session control are not enabled in this first version.
+Email delivery, password reset, MFA, organization management and broker session control are not enabled in this first version. Password recovery is unnecessary in production because credentials are managed by Keycloak.
 
 ## Verification
 

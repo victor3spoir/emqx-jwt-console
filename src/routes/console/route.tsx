@@ -12,6 +12,7 @@ export const Route = createFileRoute("/console")({
 	beforeLoad: async () => {
 		const session = await client.session({});
 		if (!session) throw redirect({ to: "/signin" });
+		if (!session.isAdmin) throw redirect({ to: "/forbidden" });
 		return { session };
 	},
 	headers: () => ({ "Cache-Control": "private, no-store" }),
@@ -32,52 +33,40 @@ function ConsoleLayout() {
 					<SignOutButton />
 				</div>
 			</header>
-			{!session.isAdmin ? (
-				<main className="mx-auto flex max-w-lg flex-col gap-4 px-6 py-16">
-					<h1 className="font-heading text-2xl">
-						Administrator access required
-					</h1>
-					<p className="text-muted-foreground">
-						Your account is registered. Ask an administrator to grant console
-						access.
-					</p>
-				</main>
-			) : (
-				<div className="mx-auto grid max-w-screen-2xl md:grid-cols-[200px_1fr]">
-					<nav
-						aria-label="Console"
-						className="flex flex-col gap-1 border-b bg-sidebar p-4 md:min-h-[calc(100dvh-81px)] md:border-r md:border-b-0"
+			<div className="mx-auto grid max-w-screen-2xl md:grid-cols-[200px_1fr]">
+				<nav
+					aria-label="Console"
+					className="flex flex-col gap-1 border-b bg-sidebar p-4 md:min-h-[calc(100dvh-81px)] md:border-r md:border-b-0"
+				>
+					<Link
+						to="/console/devices"
+						search={{ search: "", status: undefined, page: 1 }}
+						className="block rounded-md px-3 py-2 text-sm font-medium text-sidebar-foreground hover:bg-sidebar-accent"
+						activeOptions={{ includeSearch: false }}
+						activeProps={{
+							className: "bg-sidebar-accent text-sidebar-accent-foreground",
+							"aria-current": "page",
+						}}
 					>
-						<Link
-							to="/console/devices"
-							search={{ search: "", status: undefined, page: 1 }}
-							className="block rounded-md px-3 py-2 text-sm font-medium text-sidebar-foreground hover:bg-sidebar-accent"
-							activeOptions={{ includeSearch: false }}
-							activeProps={{
-								className: "bg-sidebar-accent text-sidebar-accent-foreground",
-								"aria-current": "page",
-							}}
-						>
-							Devices
-						</Link>
-						<Link
-							to="/console/audit"
-							search={{ search: "", outcome: undefined, page: 1 }}
-							className="block rounded-md px-3 py-2 text-sm font-medium text-sidebar-foreground hover:bg-sidebar-accent"
-							activeOptions={{ includeSearch: false }}
-							activeProps={{
-								className: "bg-sidebar-accent text-sidebar-accent-foreground",
-								"aria-current": "page",
-							}}
-						>
-							Audit log
-						</Link>
-					</nav>
-					<main id="main" className="min-w-0 p-6 md:p-8">
-						<Outlet />
-					</main>
-				</div>
-			)}
+						Devices
+					</Link>
+					<Link
+						to="/console/audit"
+						search={{ search: "", outcome: undefined, page: 1 }}
+						className="block rounded-md px-3 py-2 text-sm font-medium text-sidebar-foreground hover:bg-sidebar-accent"
+						activeOptions={{ includeSearch: false }}
+						activeProps={{
+							className: "bg-sidebar-accent text-sidebar-accent-foreground",
+							"aria-current": "page",
+						}}
+					>
+						Audit log
+					</Link>
+				</nav>
+				<main id="main" className="min-w-0 p-6 md:p-8">
+					<Outlet />
+				</main>
+			</div>
 		</div>
 	);
 }

@@ -1,4 +1,5 @@
 import { ORPCError, os } from "@orpc/server";
+import { hasAdminRole } from "#/features/auth/auth-roles";
 import { auth } from "#/lib/auth";
 
 export const publicProcedure = os
@@ -23,7 +24,7 @@ export const publicProcedure = os
 export const adminProcedure = publicProcedure.use(async ({ context, next }) => {
 	const session = await auth.api.getSession({ headers: context.headers });
 	if (!session) throw new ORPCError("UNAUTHORIZED");
-	if (session.user.banned || !session.user.role?.split(",").includes("admin"))
+	if (session.user.banned || !hasAdminRole(session.user.role))
 		throw new ORPCError("FORBIDDEN");
 	return next({ context: { actorId: session.user.id } });
 });

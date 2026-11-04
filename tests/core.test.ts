@@ -6,7 +6,14 @@ import { boundedRequest } from "../src/lib/http.server";
 import { RateLimiter } from "../src/lib/rate-limit.server";
 import { themeFromCookie } from "../src/features/theme/theme.types";
 import { auditListInput } from "../src/features/audit/audit.types";
+import { hasAdminRole, hasKeycloakRole } from "../src/features/auth/auth-roles";
 import { getServerEnv } from "../src/lib/env.server";
+
+const productionKeycloak = {
+  KEYCLOAK_ISSUER: "https://identity.example.test/realms/emqx",
+  KEYCLOAK_CLIENT_ID: "emqx-device-console",
+  KEYCLOAK_CLIENT_SECRET: "keycloak-client-secret",
+};
 
 test("short broker signing keys require explicit development opt-in and never work in production", () => {
   const source = {
@@ -19,10 +26,34 @@ test("short broker signing keys require explicit development opt-in and never wo
   assert.throws(() => getServerEnv({ ...source, NODE_ENV: "development" }), /DEVICE_JWT_SECRET/);
   assert.equal(getServerEnv({ ...source, NODE_ENV: "development", DEVICE_JWT_ALLOW_INSECURE_DEV_SECRET: "true" }).DEVICE_JWT_SECRET, source.DEVICE_JWT_SECRET);
   for (const NODE_ENV of ["production", "test", undefined]) {
-    assert.throws(() => getServerEnv({ ...source, NODE_ENV, DEVICE_JWT_ALLOW_INSECURE_DEV_SECRET: "true" }), /DEVICE_JWT_SECRET/);
+    assert.throws(() => getServerEnv({ ...source, ...(NODE_ENV === "production" ? productionKeycloak : {}), NODE_ENV, DEVICE_JWT_ALLOW_INSECURE_DEV_SECRET: "true" }), /DEVICE_JWT_SECRET/);
   }
   assert.throws(() => getServerEnv({ ...source, NODE_ENV: "development", DEVICE_JWT_ALLOW_INSECURE_DEV_SECRET: "true", DEVICE_JWT_SECRET: "" }), /DEVICE_JWT_SECRET/);
-  assert.ok(getServerEnv({ ...source, NODE_ENV: "production", DEVICE_JWT_SECRET: "b".repeat(48) }));
+  assert.ok(getServerEnv({ ...source, ...productionKeycloak, NODE_ENV: "production", DEVICE_JWT_SECRET: "b".repeat(48) }));
+});
+
+test("production requires complete HTTPS Keycloak configuration and disables passwords", () => {
+  const source = {
+    DATABASE_URL: "postgresql://localhost/test",
+    BETTER_AUTH_URL: "https://console.example.test",
+    BETTER_AUTH_SECRET: "a".repeat(48),
+    DEVICE_JWT_SECRET: "b".repeat(48),
+  };
+  assert.throws(() => getServerEnv({ ...source, NODE_ENV: "production" }), /Keycloak/);
+  assert.throws(() => getServerEnv({ ...source, ...productionKeycloak, KEYCLOAK_ISSUER: "http://identity.example.test/realms/emqx", NODE_ENV: "production" }), /HTTPS/);
+  assert.equal(getServerEnv({ ...source, ...productionKeycloak, NODE_ENV: "production" }).AUTH_EMAIL_PASSWORD_ENABLED, false);
+  assert.equal(getServerEnv({ ...source, NODE_ENV: "development" }).AUTH_EMAIL_PASSWORD_ENABLED, true);
+});
+
+test("Keycloak admin role accepts configured realm or client roles only", () => {
+  const clientId = "emqx-device-console";
+  assert.ok(hasKeycloakRole({ realm_access: { roles: ["admin"] } }, clientId, "admin", "realm"));
+  assert.ok(hasKeycloakRole({ resource_access: { [clientId]: { roles: ["admin"] } } }, clientId, "admin", "client"));
+  assert.equal(hasKeycloakRole({ realm_access: { roles: ["admin"] } }, clientId, "admin", "client"), false);
+  assert.equal(hasKeycloakRole({ resource_access: { other: { roles: ["admin"] } } }, clientId, "admin", "client"), false);
+  assert.equal(hasKeycloakRole({ realm_access: { roles: ["user"] } }, clientId, "admin", "realm"), false);
+  assert.ok(hasAdminRole("user,admin"));
+  assert.equal(hasAdminRole("administrator"), false);
 });
 
 test("theme cookie only accepts known themes and defaults to dark", () => {

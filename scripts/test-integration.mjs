@@ -26,7 +26,7 @@ const development = process.env.TEST_DEV === "1";
 const publicOrigin = development ? origin : `https://localhost:${port}`;
 const signingSecret = randomBytes(48).toString("base64url");
 const password = process.env.TEST_ADMIN_PASSWORD ?? randomBytes(24).toString("base64url");
-const env = { ...process.env, DATABASE_URL: connectionString, BETTER_AUTH_URL: publicOrigin, BETTER_AUTH_SECRET: randomBytes(48).toString("base64url"), DEVICE_JWT_SECRET: signingSecret, DEVICE_JWT_TTL_SECONDS: "3600", NODE_ENV: development ? "development" : "production", PORT: port, NITRO_PORT: port, HOST: "127.0.0.1" };
+const env = { ...process.env, DATABASE_URL: connectionString, BETTER_AUTH_URL: publicOrigin, BETTER_AUTH_SECRET: randomBytes(48).toString("base64url"), DEVICE_JWT_SECRET: signingSecret, DEVICE_JWT_TTL_SECONDS: "3600", NODE_ENV: "development", PORT: port, NITRO_PORT: port, HOST: "127.0.0.1" };
 let checks = 0;
 function passed(label) { checks++; console.info(`PASS ${label}`); }
 function rpc(cookie = "") {
@@ -44,7 +44,7 @@ async function token(deviceId, secret) {
 }
 try {
   await adminPool.query(`CREATE DATABASE "${database}"`);
-  execFileSync(process.execPath, ["node_modules/prisma/build/index.js", "migrate", "deploy"], { env, stdio: "pipe" });
+  execFileSync(process.execPath, ["node_modules/@prisma/prisma7/build/prisma7.js", "migrate", "deploy"], { env, stdio: "pipe" });
   prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString }) });
   execFileSync(process.execPath, ["--import", "tsx", "prisma/seed.ts"], { env: { ...env, BOOTSTRAP_ADMIN_EMAIL: "admin@example.test", BOOTSTRAP_ADMIN_PASSWORD: password }, stdio: "pipe" });
   assert.equal(await prisma.user.count({ where: { role: "admin" } }), 1);
@@ -65,6 +65,8 @@ try {
   const signinHtml = await (await fetch(`${origin}/signin`)).text();
   assert.ok(!signinHtml.includes("Create an account"));
   assert.ok(!signinHtml.includes('href="/signup'));
+  assert.ok(signinHtml.includes("Continue with Keycloak"));
+  assert.ok(signinHtml.includes("Keycloak is not configured in this environment."));
   const consoleResponse = await fetch(`${origin}/console`, { redirect: "manual" });
   assert.ok([302, 307].includes(consoleResponse.status));
   assert.match(consoleResponse.headers.get("location"), /signin/);

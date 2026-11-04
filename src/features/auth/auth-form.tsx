@@ -21,10 +21,35 @@ import {
 import { Input } from "#/components/ui/input";
 import { authClient } from "#/lib/auth-client";
 
-export function AuthForm() {
+type AuthFormProps = {
+	capabilities: {
+		keycloak: boolean;
+		password: boolean;
+	};
+};
+
+export function AuthForm({ capabilities }: AuthFormProps) {
 	const router = useRouter();
 	const queryClient = useQueryClient();
 	const [visible, setVisible] = useState(false);
+	const [keycloakPending, setKeycloakPending] = useState(false);
+	const handleKeycloakSignIn = () => {
+		setKeycloakPending(true);
+		void authClient.signIn
+			.social({
+				provider: "keycloak",
+				callbackURL: "/console",
+			})
+			.then((result) => {
+				if (result.error) toast.error("Unable to start Keycloak sign-in.");
+			})
+			.catch(() => {
+				toast.error("Unable to reach the authentication server.");
+			})
+			.finally(() => {
+				setKeycloakPending(false);
+			});
+	};
 
 	const form = useForm({
 		defaultValues: { email: "", password: "" },
@@ -59,74 +84,98 @@ export function AuthForm() {
 				<CardDescription>Manage your EMQX device fleet.</CardDescription>
 			</CardHeader>
 			<CardContent>
-				<form
-					onSubmit={(event) => {
-						event.preventDefault();
-						void form.handleSubmit();
-					}}
+				<Button
+					type="button"
+					className="w-full"
+					disabled={!capabilities.keycloak || keycloakPending}
+					onClick={handleKeycloakSignIn}
 				>
-					<FieldGroup>
-						{(["email", "password"] as const).map((name) => (
-							<form.Field key={name} name={name}>
-								{(field) => {
-									const invalid = field.state.meta.errors.length > 0;
-									return (
-										<Field data-invalid={invalid}>
-											<FieldLabel htmlFor={name}>
-												{name === "email" ? "Email" : "Password"}
-											</FieldLabel>
-											<Input
-												id={name}
-												name={name}
-												type={
-													name === "password"
-														? visible
-															? "text"
-															: "password"
-														: "email"
-												}
-												autoComplete={
-													name === "password" ? "current-password" : name
-												}
-												maxLength={name === "password" ? 128 : 254}
-												required
-												value={field.state.value}
-												onBlur={field.handleBlur}
-												onChange={(event) =>
-													field.handleChange(event.target.value)
-												}
-												aria-invalid={invalid}
-												aria-describedby={invalid ? `${name}-error` : undefined}
-											/>
-											{invalid && (
-												<FieldError
-													id={`${name}-error`}
-													errors={field.state.meta.errors}
+					{keycloakPending ? "Redirecting…" : "Continue with Keycloak"}
+				</Button>
+				{!capabilities.keycloak && (
+					<p className="mt-2 text-center text-xs text-muted-foreground">
+						Keycloak is not configured in this environment.
+					</p>
+				)}
+				{capabilities.keycloak && capabilities.password && (
+					<div className="my-6 flex items-center gap-3 text-xs text-muted-foreground">
+						<div className="h-px flex-1 bg-border" />
+						<span>Development access</span>
+						<div className="h-px flex-1 bg-border" />
+					</div>
+				)}
+				{capabilities.password && (
+					<form
+						onSubmit={(event) => {
+							event.preventDefault();
+							void form.handleSubmit();
+						}}
+					>
+						<FieldGroup>
+							{(["email", "password"] as const).map((name) => (
+								<form.Field key={name} name={name}>
+									{(field) => {
+										const invalid = field.state.meta.errors.length > 0;
+										return (
+											<Field data-invalid={invalid}>
+												<FieldLabel htmlFor={name}>
+													{name === "email" ? "Email" : "Password"}
+												</FieldLabel>
+												<Input
+													id={name}
+													name={name}
+													type={
+														name === "password"
+															? visible
+																? "text"
+																: "password"
+															: "email"
+													}
+													autoComplete={
+														name === "password" ? "current-password" : name
+													}
+													maxLength={name === "password" ? 128 : 254}
+													required
+													value={field.state.value}
+													onBlur={field.handleBlur}
+													onChange={(event) =>
+														field.handleChange(event.target.value)
+													}
+													aria-invalid={invalid}
+													aria-describedby={
+														invalid ? `${name}-error` : undefined
+													}
 												/>
-											)}
-										</Field>
-									);
-								}}
-							</form.Field>
-						))}
-						<Button
-							type="button"
-							variant="ghost"
-							size="sm"
-							aria-pressed={visible}
-							onClick={() => setVisible(!visible)}
-						>
-							{visible ? "Hide password" : "Show password"}
-						</Button>
-						<form.Subscribe selector={(state) => state.isSubmitting}>
-							{(pending) => (
-								<Button type="submit" disabled={pending}>
-									{pending ? "Please wait…" : "Sign in"}
-								</Button>
-							)}
-						</form.Subscribe>
-					</FieldGroup>
-				</form>
+												{invalid && (
+													<FieldError
+														id={`${name}-error`}
+														errors={field.state.meta.errors}
+													/>
+												)}
+											</Field>
+										);
+									}}
+								</form.Field>
+							))}
+							<Button
+								type="button"
+								variant="ghost"
+								size="sm"
+								aria-pressed={visible}
+								onClick={() => setVisible(!visible)}
+							>
+								{visible ? "Hide password" : "Show password"}
+							</Button>
+							<form.Subscribe selector={(state) => state.isSubmitting}>
+								{(pending) => (
+									<Button type="submit" disabled={pending}>
+										{pending ? "Please wait…" : "Sign in"}
+									</Button>
+								)}
+							</form.Subscribe>
+						</FieldGroup>
+					</form>
+				)}
 			</CardContent>
 		</Card>
 	);

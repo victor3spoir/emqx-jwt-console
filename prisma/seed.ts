@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { prisma } from '../src/db'
 
 async function main() {
+  if (process.env.NODE_ENV !== 'development') throw new Error('Local administrator bootstrap is only available with NODE_ENV=development.')
   const input = z.object({
     BOOTSTRAP_ADMIN_EMAIL: z.email(),
     BOOTSTRAP_ADMIN_PASSWORD: z.string().min(12).max(128),

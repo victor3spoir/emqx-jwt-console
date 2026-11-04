@@ -1,9 +1,19 @@
 import { z } from "zod";
 import { auditRouter } from "#/features/audit/audit.router.server";
+import { hasAdminRole } from "#/features/auth/auth-roles";
 import { devicesRouter } from "#/features/devices/devices.router.server";
-import { auth } from "#/lib/auth";
+import { auth, authCapabilities } from "#/lib/auth";
 import { publicProcedure } from "#/orpc/base.server";
 export default {
+	authCapabilities: publicProcedure
+		.input(z.strictObject({}))
+		.output(
+			z.strictObject({
+				keycloak: z.boolean(),
+				password: z.boolean(),
+			}),
+		)
+		.handler(() => authCapabilities),
 	session: publicProcedure
 		.input(z.strictObject({}))
 		.output(
@@ -21,7 +31,7 @@ export default {
 			return {
 				id: session.user.id,
 				name: session.user.name,
-				isAdmin: session.user.role?.split(",").includes("admin") ?? false,
+				isAdmin: hasAdminRole(session.user.role),
 			};
 		}),
 	devices: devicesRouter,

@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthRouteRouteImport } from './routes/_auth/route'
 import { Route as ConsoleRouteRouteImport } from './routes/console/route'
+import { Route as ForbiddenRouteImport } from './routes/forbidden'
 import { Route as ApiSplatRouteImport } from './routes/api.$'
 import { Route as ConsoleIndexRouteImport } from './routes/console/index'
 import { Route as AuthSigninIndexRouteImport } from './routes/_auth/signin/index'
@@ -32,6 +33,11 @@ const AuthRouteRoute = AuthRouteRouteImport.update({
 const ConsoleRouteRoute = ConsoleRouteRouteImport.update({
   id: '/console',
   path: '/console',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ForbiddenRoute = ForbiddenRouteImport.update({
+  id: '/forbidden',
+  path: '/forbidden',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiSplatRoute = ApiSplatRouteImport.update({
@@ -73,6 +79,7 @@ const ConsoleDevicesIndexRoute = ConsoleDevicesIndexRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/console': typeof ConsoleRouteRouteWithChildren
+  '/forbidden': typeof ForbiddenRoute
   '/api/$': typeof ApiSplatRoute
   '/console/': typeof ConsoleIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
@@ -83,6 +90,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/forbidden': typeof ForbiddenRoute
   '/api/$': typeof ApiSplatRoute
   '/console': typeof ConsoleIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
@@ -96,6 +104,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_auth': typeof AuthRouteRouteWithChildren
   '/console': typeof ConsoleRouteRouteWithChildren
+  '/forbidden': typeof ForbiddenRoute
   '/api/$': typeof ApiSplatRoute
   '/console/': typeof ConsoleIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
@@ -109,6 +118,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/console'
+    | '/forbidden'
     | '/api/$'
     | '/console/'
     | '/api/auth/$'
@@ -119,6 +129,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/forbidden'
     | '/api/$'
     | '/console'
     | '/api/auth/$'
@@ -131,6 +142,7 @@ export interface FileRouteTypes {
     | '/'
     | '/_auth'
     | '/console'
+    | '/forbidden'
     | '/api/$'
     | '/console/'
     | '/api/auth/$'
@@ -144,6 +156,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthRouteRoute: typeof AuthRouteRouteWithChildren
   ConsoleRouteRoute: typeof ConsoleRouteRouteWithChildren
+  ForbiddenRoute: typeof ForbiddenRoute
   ApiSplatRoute: typeof ApiSplatRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ApiRpcSplatRoute: typeof ApiRpcSplatRoute
@@ -170,6 +183,13 @@ declare module '@tanstack/react-router' {
       path: '/console'
       fullPath: '/console'
       preLoaderRoute: typeof ConsoleRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/forbidden': {
+      id: '/forbidden'
+      path: '/forbidden'
+      fullPath: '/forbidden'
+      preLoaderRoute: typeof ForbiddenRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/$': {
@@ -256,6 +276,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthRouteRoute: AuthRouteRouteWithChildren,
   ConsoleRouteRoute: ConsoleRouteRouteWithChildren,
+  ForbiddenRoute: ForbiddenRoute,
   ApiSplatRoute: ApiSplatRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiRpcSplatRoute: ApiRpcSplatRoute,
