@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { toast } from "sonner";
 import {
 	AlertDialog,
 	AlertDialogCancel,
@@ -39,14 +40,13 @@ export function CredentialDialog({
 
 export function CredentialDetails({ credential }: { credential: Credential }) {
 	const [copied, setCopied] = useState(false);
-	const [failed, setFailed] = useState(false);
 	return (
 		<>
 			<AlertDialogHeader>
 				<AlertDialogTitle>Save this device secret</AlertDialogTitle>
 				<AlertDialogDescription>
-					Provision {credential.deviceId} with this secret. It is shown once and
-					cannot be retrieved after closing.
+					Provision {credential.deviceId} with this secret. You can retrieve it
+					again later from this device list.
 				</AlertDialogDescription>
 			</AlertDialogHeader>
 			<Field>
@@ -60,11 +60,6 @@ export function CredentialDetails({ credential }: { credential: Credential }) {
 					spellCheck={false}
 				/>
 			</Field>
-			{failed && (
-				<p role="alert" className="text-sm text-destructive">
-					Copy failed. Select the secret and copy it manually.
-				</p>
-			)}
 			<AlertDialogFooter>
 				<Button
 					type="button"
@@ -73,9 +68,11 @@ export function CredentialDetails({ credential }: { credential: Credential }) {
 						try {
 							await navigator.clipboard.writeText(credential.secret);
 							setCopied(true);
-							setFailed(false);
+							toast.success("Device secret copied to your clipboard.");
 						} catch {
-							setFailed(true);
+							toast.error(
+								"Copy failed. Select the secret and copy it manually.",
+							);
 						}
 					}}
 				>

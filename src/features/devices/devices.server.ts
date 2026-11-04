@@ -29,7 +29,13 @@ type PublicDevice = Prisma.DeviceGetPayload<{
 }>;
 export function toDeviceDto(device: PublicDevice) {
 	return {
-		...device,
+		id: device.id,
+		deviceId: device.deviceId,
+		serialNumber: device.serialNumber,
+		mqttUsername: device.mqttUsername,
+		status: device.status,
+		firmwareVersion: device.firmwareVersion,
+		productModel: device.productModel,
 		createdAt: device.createdAt.toISOString(),
 		lastTokenIssuedAt: device.lastTokenIssuedAt?.toISOString() ?? null,
 		revokedAt: device.revokedAt?.toISOString() ?? null,
@@ -87,7 +93,11 @@ export async function registerDevice(
 	return withDeviceErrors(() =>
 		prisma.$transaction(async (tx) => {
 			const device = await tx.device.create({
-				data: { ...fields, deviceSecretHash: credential.hash },
+				data: {
+					...fields,
+					deviceSecret: credential.secret,
+					deviceSecretHash: credential.hash,
+				},
 				select: publicDeviceSelect,
 			});
 			await tx.auditEvent.create({
@@ -177,7 +187,10 @@ export async function rotateDeviceSecret(id: string, actorId: string) {
 	return prisma.$transaction(async (tx) => {
 		const result = await tx.device.updateMany({
 			where: { id, status: { not: "revoked" } },
-			data: { deviceSecretHash: credential.hash },
+			data: {
+				deviceSecret: credential.secret,
+				deviceSecretHash: credential.hash,
+			},
 		});
 		if (!result.count)
 			throw new ORPCError("CONFLICT", {
@@ -201,5 +214,47 @@ export async function rotateDeviceSecret(id: string, actorId: string) {
 			),
 			secret: credential.secret,
 		};
+	});
+}
+export async function getDeviceSecret(id: string, actorId: string) {
+	const device = await prisma.device.findUnique({
+		where: { id },
+		select: { ...publicDeviceSelect, deviceSecret: true },
+	});
+	if (!device)
+		throw new ORPCError("NOT_FOUND", { message: "Device not found." });
+	if (!device.deviceSecret)
+		throw new ORPCError("CONFLICT", {
+			message:
+				"This device predates retrievable secrets. Rotate its secret to save a new one; its existing credential still works.",
+		});
+	await prisma.auditEvent.create({
+		data: {
+			actorId,
+			action: "device.secret.viewed",
+			resourceId: id,
+			outcome: "success",
+		},
+	});
+	return {
+		device: toDeviceDto(device),
+		secret: device.deviceSecret,
+	};
+}
+export async function deleteDevice(id: string, actorId: string) {
+	return prisma.$transaction(async (tx) => {
+		const device = await tx.device.findUnique({ where: { id } });
+		if (!device)
+			throw new ORPCError("NOT_FOUND", { message: "Device not found." });
+		await tx.device.delete({ where: { id } });
+		await tx.auditEvent.create({
+			data: {
+				actorId,
+				action: "device.deleted",
+				resourceId: id,
+				outcome: "success",
+			},
+		});
+		return { id };
 	});
 }

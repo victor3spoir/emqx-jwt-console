@@ -6,6 +6,7 @@ import { Pool } from "pg";
 import { createORPCClient } from "@orpc/client";
 import { RPCLink } from "@orpc/client/fetch";
 import { jwtVerify } from "jose";
+import { hashPassword } from "better-auth/crypto";
 import { PrismaClient } from "../src/generated/prisma/client.ts";
 import { PrismaPg } from "@prisma/adapter-pg";
 
@@ -59,7 +60,11 @@ try {
   }
   assert.ok(ready, "Server did not become ready");
   passed("built application boot and auth health endpoint");
-  for (const path of ["/", "/signin", "/signup"]) assert.equal((await fetch(`${origin}${path}`)).status, 200);
+  for (const path of ["/", "/signin"]) assert.equal((await fetch(`${origin}${path}`)).status, 200);
+  for (const path of ["/signup", "/signup/"]) assert.equal((await fetch(`${origin}${path}`)).status, 404);
+  const signinHtml = await (await fetch(`${origin}/signin`)).text();
+  assert.ok(!signinHtml.includes("Create an account"));
+  assert.ok(!signinHtml.includes('href="/signup'));
   const consoleResponse = await fetch(`${origin}/console`, { redirect: "manual" });
   assert.ok([302, 307].includes(consoleResponse.status));
   assert.match(consoleResponse.headers.get("location"), /signin/);
@@ -71,14 +76,33 @@ try {
   passed("saved theme is server-rendered and invalid preferences default to dark");
   const forgedSignup = await authPost("sign-up/email", { name: "Forged", email: "forged@example.test", password, role: "admin" });
   assert.equal(forgedSignup.status, 400);
+  assert.equal((await forgedSignup.json()).code, "EMAIL_PASSWORD_SIGN_UP_DISABLED");
   assert.equal(await prisma.user.count({ where: { email: "forged@example.test" } }), 0);
   const memberSignup = await authPost("sign-up/email", { name: "Member", email: "member@example.test", password });
-  if (memberSignup.status !== 200) throw new Error(`Signup failed: ${await memberSignup.text()}`);
-  const memberCookie = cookieOf(memberSignup);
-  const member = await prisma.user.findUniqueOrThrow({ where: { email: "member@example.test" } });
+  assert.equal(memberSignup.status, 400);
+  assert.equal((await memberSignup.json()).code, "EMAIL_PASSWORD_SIGN_UP_DISABLED");
+  const anonymousCreate = await authPost("admin/create-user", { name: "Unauthorized", email: "unauthorized@example.test", password, role: "admin" });
+  assert.equal(anonymousCreate.status, 401);
+  assert.equal(await prisma.user.count(), 1);
+  passed("signup pages removed and public account creation denied without creating users");
+  // Provision an ordinary-user fixture privately to retain authorization coverage.
+  const memberId = randomUUID();
+  const member = await prisma.user.create({ data: {
+    id: memberId, name: "Member", email: "member@example.test", role: "user",
+    accounts: { create: { id: randomUUID(), accountId: memberId, providerId: "credential", password: await hashPassword(password) } },
+  } });
+  const memberSignIn = await authPost("sign-in/email", { email: member.email, password });
+  assert.equal(memberSignIn.status, 200);
+  const memberCookie = cookieOf(memberSignIn);
   assert.equal(member.role, "user");
   assert.equal((await rpc(memberCookie).session({})).isAdmin, false);
-  passed("public signup cannot grant admin privileges");
+  const memberCreate = await fetch(`${origin}/api/auth/admin/create-user`, {
+    method: "POST", headers: { "content-type": "application/json", origin: publicOrigin, cookie: memberCookie },
+    body: JSON.stringify({ name: "Unauthorized", email: "unauthorized@example.test", password, role: "admin" }),
+  });
+  assert.equal(memberCreate.status, 403);
+  assert.equal(await prisma.user.count(), 2);
+  passed("existing ordinary users can sign in but cannot provision accounts");
   const adminSignIn = await authPost("sign-in/email", { email: "admin@example.test", password });
   assert.equal(adminSignIn.status, 200);
   const adminCookie = cookieOf(adminSignIn);
@@ -90,17 +114,25 @@ try {
     (c) => c.devices.list({}), (c) => c.devices.register(fields),
     (c) => c.devices.update({ id: missingId, fields: { serialNumber: "updated", productModel: null, firmwareVersion: null } }),
     (c) => c.devices.rotateSecret({ id: missingId }), (c) => c.devices.setStatus({ id: missingId, status: "revoked" }),
+    (c) => c.devices.getSecret({ id: missingId }), (c) => c.devices.delete({ id: missingId }),
   ];
   for (const operation of operations) {
     await assert.rejects(() => operation(rpc()), (error) => error.code === "UNAUTHORIZED");
     await assert.rejects(() => operation(rpc(memberCookie)), (error) => error.code === "FORBIDDEN");
   }
   assert.equal(await prisma.device.count(), 0);
-  passed("all five device operations deny anonymous and ordinary users");
+  passed("all device operations, including secret viewing and deletion, deny anonymous and ordinary users");
   const created = await admin.devices.register(fields);
   assert.ok(created.secret);
   const stored = await prisma.device.findUniqueOrThrow({ where: { id: created.device.id } });
   assert.notEqual(stored.deviceSecretHash, created.secret);
+  assert.equal((await admin.devices.getSecret({ id: created.device.id })).secret, created.secret);
+  assert.ok(!JSON.stringify(await rpc(adminCookie).audit.list({})).includes(created.secret));
+  await prisma.device.update({ where: { id: created.device.id }, data: { deviceSecret: "" } });
+  await assert.rejects(() => admin.devices.getSecret({ id: created.device.id }), (error) => error.code === "CONFLICT" && /Rotate its secret/.test(error.message));
+  assert.equal((await token(fields.deviceId, created.secret)).status, 200);
+  await prisma.device.update({ where: { id: created.device.id }, data: { deviceSecret: created.secret } });
+  passed("stored secrets can be retrieved; legacy hash-only credentials stay valid and return a clear recovery message");
   const listed = await admin.devices.list({ search: "test", pageSize: 1 });
   assert.equal(listed.total, 1); assert.equal(listed.devices.length, 1);
   assert.ok(!JSON.stringify(listed).includes(stored.deviceSecretHash));
@@ -128,6 +160,7 @@ try {
   assert.equal((await token("unknown", "incorrect")).status, 401);
   await admin.devices.update({ id: created.device.id, fields: { serialNumber: "updated", productModel: "Sensor 2", firmwareVersion: "2.0" } });
   const rotated = await admin.devices.rotateSecret({ id: created.device.id });
+  assert.equal((await admin.devices.getSecret({ id: created.device.id })).secret, rotated.secret);
   assert.equal((await token(fields.deviceId, created.secret)).status, 401);
   assert.equal((await token(fields.deviceId, rotated.secret)).status, 200);
   passed("metadata editing and rotation invalidate old provisioning credentials");
@@ -148,6 +181,7 @@ try {
   const importedFields = { ...fields, deviceId: "existing-secret-device", serialNumber: "factory-serial", mqttUsername: "factory-user", secret: suppliedSecret };
   const imported = await admin.devices.register(importedFields);
   assert.equal(imported.secret, suppliedSecret);
+  assert.equal((await admin.devices.getSecret({ id: imported.device.id })).secret, suppliedSecret);
   const importedRow = await prisma.device.findUniqueOrThrow({ where: { id: imported.device.id } });
   assert.ok(importedRow.deviceSecretHash.startsWith("scrypt:"));
   assert.ok(!importedRow.deviceSecretHash.includes(suppliedSecret));
@@ -161,6 +195,10 @@ try {
   assert.equal(blankSecret.secret.length, 43);
   assert.equal((await token("blank-secret-device", blankSecret.secret)).status, 200);
   passed("supplied and blank registration secrets, exact-byte verification and secret-free listings");
+  assert.deepEqual(await admin.devices.delete({ id: blankSecret.device.id }), { id: blankSecret.device.id });
+  assert.equal(await prisma.device.findUnique({ where: { id: blankSecret.device.id } }), null);
+  await assert.rejects(() => admin.devices.getSecret({ id: blankSecret.device.id }), (error) => error.code === "NOT_FOUND");
+  passed("admin deletion removes the device and subsequent secret retrieval returns not found");
   const denied = await fetch(`${origin}/api/rpc/devices/register`, { method: "POST", headers: { origin: "https://attacker.example", cookie: adminCookie, "content-type": "application/json" }, body: JSON.stringify(fields) });
   assert.equal(denied.status, 403);
   assert.equal((await fetch(`${origin}/api/devices/token`, { method: "POST", body: "x".repeat(3000) })).status, 413);
@@ -194,6 +232,43 @@ try {
   const deniedAuditHtml = await fetch(`${origin}/console/audit`, { headers: { cookie: memberCookie } });
   const deniedAuditBody = await deniedAuditHtml.text(); assert.ok(deniedAuditBody.includes("Administrator access required")); assert.ok(!deniedAuditBody.includes("device.token.issued"));
   passed("audit log access control, paging, filtering, actor labels and protected page rendering");
+  const bulkRows = Array.from({ length: 25 }, (_, index) => ({
+    deviceId: `bulk-device-${index}`, serialNumber: `bulk-serial-${index}`, mqttUsername: `bulk-user-${index}`,
+    firmwareVersion: null, productModel: "Bulk sensor", status: index === 0 ? "disabled" : "active",
+    ...(index === 1 ? { secret: "bulk-provisioning-secret-123" } : {}),
+  }));
+  for (const [caller, expectedCode] of [[rpc(), "UNAUTHORIZED"], [rpc(memberCookie), "FORBIDDEN"]]) {
+    await assert.rejects(() => caller.devices.import({ rows: [bulkRows[0]] }), (error) => error.code === expectedCode);
+    await assert.rejects(() => caller.devices.export({ includeSecrets: true }), (error) => error.code === expectedCode);
+  }
+  assert.deepEqual(await admin.devices.import({ rows: bulkRows }), { imported: 25 });
+  const publicExport = await admin.devices.export({ search: "bulk-device-" });
+  assert.equal(publicExport.devices.length, 25);
+  assert.ok(publicExport.devices.every((device) => !("secret" in device) && !("deviceSecretHash" in device)));
+  const secretExport = await admin.devices.export({ search: "bulk-device-", includeSecrets: true });
+  assert.equal(secretExport.devices.find((device) => device.deviceId === "bulk-device-1").secret, "bulk-provisioning-secret-123");
+  assert.ok(secretExport.devices.every((device) => device.secret.length >= 12));
+  assert.equal((await admin.devices.export({ search: "bulk-device-", status: "disabled" })).devices.length, 1);
+  assert.equal((await admin.devices.list({ search: "bulk-device-", pageSize: 20 })).devices.length, 20);
+  passed("bulk import and filtered exports span pagination, protect secrets by default, and require admin access");
+  const beforeFailedImport = await prisma.device.count();
+  const freshRow = { ...bulkRows[1], deviceId: "rollback-new", serialNumber: "rollback-new", mqttUsername: "rollback-new" };
+  await assert.rejects(() => admin.devices.import({ rows: [freshRow, bulkRows[0]] }), (error) => error.code === "CONFLICT" && /Row 3/.test(error.message));
+  assert.equal(await prisma.device.count(), beforeFailedImport);
+  assert.equal(await prisma.device.findUnique({ where: { deviceId: "rollback-new" } }), null);
+  await assert.rejects(() => admin.devices.import({ rows: [freshRow, freshRow] }), (error) => error.code === "BAD_REQUEST");
+  await assert.rejects(() => admin.devices.import({ rows: [{ ...freshRow, role: "admin" }] }), (error) => error.code === "BAD_REQUEST");
+  await assert.rejects(() => admin.devices.import({ rows: Array.from({ length: 201 }, () => freshRow) }), (error) => error.code === "BAD_REQUEST");
+  assert.equal(await prisma.device.count(), beforeFailedImport);
+  const importedAudit = await prisma.auditEvent.findMany({ where: { action: "device.imported" } });
+  assert.equal(importedAudit.length, 25);
+  assert.ok(importedAudit.every((event) => event.actorId && event.resourceId));
+  assert.ok(!JSON.stringify(await prisma.auditEvent.findMany()).includes("bulk-provisioning-secret-123"));
+  const csrfImport = await fetch(`${origin}/api/rpc/devices/import`, { method: "POST", headers: { origin: "https://attacker.example", cookie: adminCookie, "content-type": "application/json" }, body: JSON.stringify({ json: { rows: [freshRow] } }) });
+  assert.equal(csrfImport.status, 403);
+  const oversizedImport = await fetch(`${origin}/api/rpc/devices/import`, { method: "POST", headers: { origin: publicOrigin, cookie: adminCookie, "content-type": "application/json" }, body: "x".repeat(512 * 1024 + 1) });
+  assert.equal(oversizedImport.status, 413);
+  passed("duplicate imports roll back atomically; row limits, unexpected fields, CSRF and body limits are enforced with secret-free audit events");
   console.info(`${checks} integration groups passed against a temporary database.`);
   if (development && process.env.TEST_BROWSER_PREVIEW === "1") {
     await prisma.rateLimit.deleteMany();

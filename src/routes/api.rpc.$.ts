@@ -18,7 +18,13 @@ async function handle({ request }: { request: Request }) {
 			origin !== allowed)
 	)
 		return new Response("Forbidden", { status: 403 });
-	const bounded = await boundedRequest(request);
+	// Bulk imports have a separate bounded budget; ordinary RPC requests stay at 16 KiB.
+	const isDeviceImport =
+		new URL(request.url).pathname === "/api/rpc/devices/import";
+	const bounded = await boundedRequest(
+		request,
+		isDeviceImport ? 512 * 1024 : 16384,
+	);
 	if (!bounded) return new Response("Request too large", { status: 413 });
 	const { response } = await handler.handle(bounded, {
 		prefix: "/api/rpc",

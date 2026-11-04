@@ -1,8 +1,8 @@
 import { useForm } from "@tanstack/react-form";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { toast } from "sonner";
 import { z } from "zod";
-import { Alert, AlertDescription } from "#/components/ui/alert";
 import {
 	AlertDialog,
 	AlertDialogCancel,
@@ -23,12 +23,12 @@ import {
 } from "#/components/ui/field";
 import { Input } from "#/components/ui/input";
 import { client } from "#/orpc/client";
-import { CredentialDetails } from "./credential-dialog";
 import {
 	type DeviceDto,
 	deviceFields,
 	registrationSecret,
-} from "./devices.types";
+} from "../devices.types";
+import { CredentialDetails } from "./credential-dialog";
 
 const labels = {
 	deviceId: "Device ID",
@@ -53,7 +53,6 @@ export function DeviceEditor({
 	children: React.ReactNode;
 }) {
 	const [open, setOpen] = useState(false);
-	const [saved, setSaved] = useState(false);
 	const [credential, setCredential] = useState<{
 		deviceId: string;
 		secret: string;
@@ -65,7 +64,6 @@ export function DeviceEditor({
 				setOpen(next);
 				if (!next) {
 					setCredential(null);
-					setSaved(false);
 				}
 			}}
 		>
@@ -88,25 +86,22 @@ export function DeviceEditor({
 									: "Create an identity using an existing secret or generate one."}
 							</AlertDialogDescription>
 						</AlertDialogHeader>
-						{saved ? (
-							<>
-								<Alert>
-									<AlertDescription>Device changes saved.</AlertDescription>
-								</Alert>
-								<AlertDialogFooter>
-									<AlertDialogCancel>Close</AlertDialogCancel>
-								</AlertDialogFooter>
-							</>
-						) : (
-							open && (
-								<DeviceForm
-									device={device}
-									onSaved={(secret) => {
-										setSaved(true);
-										if (secret) setCredential(secret);
-									}}
-								/>
-							)
+						{open && (
+							<DeviceForm
+								device={device}
+								onSaved={(secret) => {
+									toast.success(
+										device
+											? "Device changes saved."
+											: "Device registered successfully.",
+									);
+									if (secret) {
+										setCredential(secret);
+									} else {
+										setOpen(false);
+									}
+								}}
+							/>
 						)}
 					</>
 				)}
@@ -123,7 +118,6 @@ function DeviceForm({
 	onSaved: (credential?: { deviceId: string; secret: string }) => void;
 }) {
 	const queryClient = useQueryClient();
-	const [error, setError] = useState("");
 	const form = useForm({
 		defaultValues: {
 			deviceId: device?.deviceId ?? "",
@@ -141,7 +135,6 @@ function DeviceForm({
 			}),
 		},
 		onSubmit: async ({ value }) => {
-			setError("");
 			try {
 				const fields = {
 					...value,
@@ -164,7 +157,7 @@ function DeviceForm({
 				}
 				await queryClient.invalidateQueries();
 			} catch (failure) {
-				setError(
+				toast.error(
 					failure instanceof Error ? failure.message : "Unable to save device.",
 				);
 			}
@@ -178,11 +171,6 @@ function DeviceForm({
 			}}
 		>
 			<FieldGroup>
-				{error && (
-					<Alert variant="destructive">
-						<AlertDescription role="alert">{error}</AlertDescription>
-					</Alert>
-				)}
 				{keys.map((key) => (
 					<form.Field key={key} name={key}>
 						{(field) => {

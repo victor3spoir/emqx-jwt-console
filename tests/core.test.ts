@@ -6,6 +6,24 @@ import { boundedRequest } from "../src/lib/http.server";
 import { RateLimiter } from "../src/lib/rate-limit.server";
 import { themeFromCookie } from "../src/features/theme/theme.types";
 import { auditListInput } from "../src/features/audit/audit.types";
+import { getServerEnv } from "../src/lib/env.server";
+
+test("short broker signing keys require explicit development opt-in and never work in production", () => {
+  const source = {
+    DATABASE_URL: "postgresql://localhost/test",
+    BETTER_AUTH_URL: "https://console.example.test",
+    BETTER_AUTH_SECRET: "a".repeat(48),
+    DEVICE_JWT_SECRET: "local-test-key",
+  };
+  assert.throws(() => getServerEnv(source), /DEVICE_JWT_SECRET/);
+  assert.throws(() => getServerEnv({ ...source, NODE_ENV: "development" }), /DEVICE_JWT_SECRET/);
+  assert.equal(getServerEnv({ ...source, NODE_ENV: "development", DEVICE_JWT_ALLOW_INSECURE_DEV_SECRET: "true" }).DEVICE_JWT_SECRET, source.DEVICE_JWT_SECRET);
+  for (const NODE_ENV of ["production", "test", undefined]) {
+    assert.throws(() => getServerEnv({ ...source, NODE_ENV, DEVICE_JWT_ALLOW_INSECURE_DEV_SECRET: "true" }), /DEVICE_JWT_SECRET/);
+  }
+  assert.throws(() => getServerEnv({ ...source, NODE_ENV: "development", DEVICE_JWT_ALLOW_INSECURE_DEV_SECRET: "true", DEVICE_JWT_SECRET: "" }), /DEVICE_JWT_SECRET/);
+  assert.ok(getServerEnv({ ...source, NODE_ENV: "production", DEVICE_JWT_SECRET: "b".repeat(48) }));
+});
 
 test("theme cookie only accepts known themes and defaults to dark", () => {
   assert.equal(themeFromCookie(""), "dark");

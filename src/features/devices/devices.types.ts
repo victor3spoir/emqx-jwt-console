@@ -38,6 +38,10 @@ export const listInput = z.strictObject({
 	pageSize: z.number().int().min(1).max(100).default(20),
 });
 export const idInput = z.strictObject({ id: z.uuid() });
+export const deviceSecretOutput = z.strictObject({
+	device: deviceDto,
+	secret: z.string(),
+});
 export const tokenInput = z.strictObject({
 	device_id: identifier,
 	device_secret: z.string().min(1).max(256),

@@ -1,5 +1,6 @@
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { z } from "zod";
 import { Button } from "#/components/ui/button";
 import {
@@ -10,9 +11,11 @@ import {
 } from "#/components/ui/empty";
 import { Field, FieldLabel } from "#/components/ui/field";
 import { Input } from "#/components/ui/input";
-import { DeviceEditor } from "#/features/devices/device-editor";
+import { DeviceEditor } from "#/features/devices/components/device-editor";
+import { DevicesTable } from "#/features/devices/components/devices-table";
+import { ExportDevices } from "#/features/devices/components/export-devices";
+import { ImportDevices } from "#/features/devices/components/import-devices";
 import { deviceStatus } from "#/features/devices/devices.types";
-import { DevicesTable } from "#/features/devices/devices-table";
 import { orpc } from "#/orpc/client";
 
 const searchSchema = z.object({
@@ -44,10 +47,33 @@ export const Route = createFileRoute("/console/devices/")({
 function DevicesPage() {
 	const search = Route.useSearch();
 	const navigate = Route.useNavigate();
+	const [searchInput, setSearchInput] = useState(search.search);
 	const { data } = useSuspenseQuery(
 		orpc.devices.list.queryOptions({ input: { ...search, pageSize: 20 } }),
 	);
 	const pages = Math.max(1, Math.ceil(data.total / 20));
+
+	useEffect(() => {
+		setSearchInput(search.search);
+	}, [search.search]);
+
+	useEffect(() => {
+		const normalizedSearch = searchInput.trim();
+		if (normalizedSearch === search.search) return;
+
+		const timeout = window.setTimeout(() => {
+			void navigate({
+				search: {
+					search: normalizedSearch,
+					status: search.status,
+					page: 1,
+				},
+			});
+		}, 300);
+
+		return () => window.clearTimeout(timeout);
+	}, [navigate, search.search, search.status, searchInput]);
+
 	return (
 		<div className="flex flex-col gap-6">
 			<div className="flex flex-wrap items-start justify-between gap-4">
@@ -57,27 +83,19 @@ function DevicesPage() {
 						Manage provisioning and token access for your fleet.
 					</p>
 				</div>
-				<DeviceEditor>
-					<Button>Register device</Button>
-				</DeviceEditor>
+				<div className="flex flex-wrap gap-2">
+					<ImportDevices />
+					<ExportDevices
+						search={search.search}
+						status={search.status}
+						total={data.total}
+					/>
+					<DeviceEditor>
+						<Button>Register device</Button>
+					</DeviceEditor>
+				</div>
 			</div>
-			<form
-				key={`${search.search}:${search.status}`}
-				className="flex flex-wrap items-end gap-3"
-				onSubmit={(event) => {
-					event.preventDefault();
-					const data = new FormData(event.currentTarget);
-					void navigate({
-						search: {
-							search: String(data.get("search") ?? ""),
-							status: deviceStatus
-								.optional()
-								.parse(data.get("status") || undefined),
-							page: 1,
-						},
-					});
-				}}
-			>
+			<div className="flex flex-wrap items-end gap-3">
 				<Field className="w-full sm:w-64">
 					<FieldLabel htmlFor="search">Search devices</FieldLabel>
 					<Input
@@ -85,8 +103,9 @@ function DevicesPage() {
 						name="search"
 						type="search"
 						maxLength={100}
-						defaultValue={search.search}
+						value={searchInput}
 						placeholder="ID, serial number, username or model"
+						onChange={(event) => setSearchInput(event.target.value)}
 					/>
 				</Field>
 				<Field className="w-40">
@@ -95,8 +114,19 @@ function DevicesPage() {
 						id="status"
 						aria-label="Status"
 						name="status"
-						defaultValue={search.status ?? ""}
+						value={search.status ?? ""}
 						className="h-8 rounded-md border border-input bg-surface-inset px-2 text-sm"
+						onChange={(event) =>
+							void navigate({
+								search: {
+									search: search.search,
+									status: deviceStatus
+										.optional()
+										.parse(event.target.value || undefined),
+									page: 1,
+								},
+							})
+						}
 					>
 						<option value="">All statuses</option>
 						<option value="active">Active</option>
@@ -104,9 +134,6 @@ function DevicesPage() {
 						<option value="revoked">Revoked</option>
 					</select>
 				</Field>
-				<Button variant="outline" type="submit">
-					Apply filters
-				</Button>
 				{(search.search || search.status) && (
 					<Button
 						variant="ghost"
@@ -120,7 +147,7 @@ function DevicesPage() {
 						Clear
 					</Button>
 				)}
-			</form>
+			</div>
 			<div className="overflow-hidden rounded-md border bg-card">
 				{data.devices.length ? (
 					<DevicesTable devices={data.devices} />

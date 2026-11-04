@@ -1,7 +1,7 @@
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
+import { toast } from "sonner";
 import { z } from "zod";
-import { Alert, AlertDescription } from "#/components/ui/alert";
 import { Button } from "#/components/ui/button";
 import {
 	Empty,
@@ -45,7 +45,7 @@ export const Route = createFileRoute("/console/audit/")({
 function AuditPage() {
 	const search = Route.useSearch();
 	const navigate = Route.useNavigate();
-	const { data, refetch, isFetching, isRefetchError } = useSuspenseQuery(
+	const { data, refetch, isFetching } = useSuspenseQuery(
 		orpc.audit.list.queryOptions({ input: { ...search, pageSize: 20 } }),
 	);
 	const pages = Math.max(1, Math.ceil(data.total / 20));
@@ -63,19 +63,20 @@ function AuditPage() {
 					type="button"
 					variant="outline"
 					disabled={isFetching}
-					onClick={() => void refetch()}
+					onClick={async () => {
+						const result = await refetch();
+						if (result.isError) {
+							toast.error(
+								"Unable to refresh. Showing the previously loaded audit events; try again.",
+							);
+							return;
+						}
+						toast.success("Audit log refreshed.");
+					}}
 				>
 					{isFetching ? "Refreshing…" : "Refresh"}
 				</Button>
 			</div>
-			{isRefetchError && (
-				<Alert variant="destructive">
-					<AlertDescription role="alert">
-						Unable to refresh. Showing the previously loaded audit events; try
-						Refresh again.
-					</AlertDescription>
-				</Alert>
-			)}
 			<form
 				key={`${search.search}:${search.outcome}`}
 				className="flex flex-wrap items-end gap-3"

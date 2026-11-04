@@ -95,6 +95,7 @@ model Device {
   serialNumber      String       @unique @map("serial_number") @db.VarChar(100)
   mqttUsername      String       @unique @map("mqtt_username") @db.VarChar(100)
   deviceSecretHash  String       @map("device_secret_hash")
+  deviceSecret      String       @map("device_secret")
   status            DeviceStatus @default(active)
   firmwareVersion   String?      @map("firmware_version") @db.VarChar(50)
   productModel      String?      @map("product_model") @db.VarChar(100)
@@ -118,4 +119,3 @@ model AuditEvent {
   @@index([resourceId, createdAt])
   @@map("audit_events")
 }
-

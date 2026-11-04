@@ -11,6 +11,13 @@ export async function issueDeviceToken(input: z.infer<typeof tokenInput>) {
 	deviceRateLimiter.consume(`device:${input.device_id}`, 10);
 	const device = await prisma.device.findUnique({
 		where: { deviceId: input.device_id },
+		select: {
+			id: true,
+			deviceId: true,
+			mqttUsername: true,
+			deviceSecretHash: true,
+			status: true,
+		},
 	});
 	const validSecret = await verifyDeviceSecret(
 		input.device_secret,

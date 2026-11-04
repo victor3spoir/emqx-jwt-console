@@ -1,4 +1,12 @@
 import {
+	IconBan,
+	IconCheck,
+	IconKey,
+	IconPencil,
+	IconRefresh,
+	IconTrash,
+} from "@tabler/icons-react";
+import {
 	createColumnHelper,
 	tableFeatures,
 	useTable,
@@ -13,9 +21,9 @@ import {
 	TableHeader,
 	TableRow,
 } from "#/components/ui/table";
+import type { DeviceDto } from "../devices.types";
 import { DeviceAction } from "./device-action";
 import { DeviceEditor } from "./device-editor";
-import type { DeviceDto } from "./devices.types";
 
 const features = tableFeatures({});
 const helper = createColumnHelper<typeof features, DeviceDto>();
@@ -75,24 +83,44 @@ const columns = helper.columns([
 	helper.display({
 		id: "actions",
 		header: "Actions",
-		cell: ({ row }) =>
-			row.original.status === "revoked" ? (
-				<DeviceAction device={row.original} action="active" />
-			) : (
-				<div className="flex flex-wrap gap-2">
+		cell: ({ row }) => (
+			<div className="flex items-center justify-end">
+				<div className="inline-flex items-center gap-0.5 rounded-lg border bg-muted/40 p-0.5 shadow-sm">
 					<DeviceEditor device={row.original}>
-						<Button variant="outline" size="sm">
-							Edit
+						<Button
+							variant="ghost"
+							size="icon-sm"
+							aria-label={`Edit ${row.original.deviceId}`}
+							title="Edit device"
+						>
+							<IconPencil />
 						</Button>
 					</DeviceEditor>
-					<DeviceAction
-						device={row.original}
-						action={row.original.status === "active" ? "disabled" : "active"}
-					/>
-					<DeviceAction device={row.original} action="rotate" />
-					<DeviceAction device={row.original} action="revoked" />
+					<DeviceAction device={row.original} action="secret">
+						<IconKey />
+					</DeviceAction>
+					<DeviceAction device={row.original} action="rotate">
+						<IconRefresh />
+					</DeviceAction>
+					{row.original.status === "revoked" ? (
+						<DeviceAction device={row.original} action="active">
+							<IconCheck />
+						</DeviceAction>
+					) : (
+						<DeviceAction
+							device={row.original}
+							action={row.original.status === "active" ? "disabled" : "active"}
+						>
+							{row.original.status === "active" ? <IconBan /> : <IconCheck />}
+						</DeviceAction>
+					)}
+					<div className="mx-0.5 h-5 w-px bg-border" aria-hidden="true" />
+					<DeviceAction device={row.original} action="delete">
+						<IconTrash />
+					</DeviceAction>
 				</div>
-			),
+			</div>
+		),
 	}),
 ]);
 export function DevicesTable({ devices }: { devices: DeviceDto[] }) {
