@@ -1,3 +1,4 @@
+import { IconPlus, IconSearch } from "@tabler/icons-react";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
@@ -75,15 +76,17 @@ function DevicesPage() {
 	}, [navigate, search.search, search.status, searchInput]);
 
 	return (
-		<div className="flex flex-col gap-6">
+		<div className="mx-auto flex w-full max-w-[78rem] flex-col gap-5">
 			<div className="flex flex-wrap items-start justify-between gap-4">
-				<div>
-					<h1 className="font-heading text-2xl">Devices</h1>
-					<p className="mt-1 text-sm text-muted-foreground">
+				<div className="max-w-xl">
+					<h1 className="font-heading text-3xl font-semibold tracking-[-0.025em]">
+						Devices
+					</h1>
+					<p className="mt-1.5 text-sm leading-6 text-muted-foreground">
 						Manage provisioning and token access for your fleet.
 					</p>
 				</div>
-				<div className="flex flex-wrap gap-2">
+				<div className="flex flex-wrap items-center gap-2">
 					<ImportDevices />
 					<ExportDevices
 						search={search.search}
@@ -91,31 +94,45 @@ function DevicesPage() {
 						total={data.total}
 					/>
 					<DeviceEditor>
-						<Button>Register device</Button>
+						<Button className="shadow-sm">
+							<IconPlus data-icon="inline-start" />
+							Register device
+						</Button>
 					</DeviceEditor>
 				</div>
 			</div>
-			<div className="flex flex-wrap items-end gap-3">
-				<Field className="w-full sm:w-64">
-					<FieldLabel htmlFor="search">Search devices</FieldLabel>
-					<Input
-						id="search"
-						name="search"
-						type="search"
-						maxLength={100}
-						value={searchInput}
-						placeholder="ID, serial number, username or model"
-						onChange={(event) => setSearchInput(event.target.value)}
-					/>
+			<div className="flex flex-wrap items-end gap-3 rounded-2xl border border-border/70 bg-card/70 p-3 shadow-[0_1px_2px_rgb(0_0_0/0.04),0_8px_30px_rgb(0_0_0/0.04)] backdrop-blur-sm">
+				<Field className="min-w-0 flex-1 basis-64">
+					<FieldLabel htmlFor="search" className="text-xs font-medium">
+						Search devices
+					</FieldLabel>
+					<div className="relative">
+						<IconSearch
+							aria-hidden="true"
+							className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
+						/>
+						<Input
+							id="search"
+							name="search"
+							type="search"
+							maxLength={100}
+							value={searchInput}
+							className="h-10 rounded-xl bg-background/65 pr-3 pl-9 shadow-inner"
+							placeholder="ID, serial number, username or model"
+							onChange={(event) => setSearchInput(event.target.value)}
+						/>
+					</div>
 				</Field>
-				<Field className="w-40">
-					<FieldLabel htmlFor="status">Status</FieldLabel>
+				<Field className="w-44">
+					<FieldLabel htmlFor="status" className="text-xs font-medium">
+						Status
+					</FieldLabel>
 					<select
 						id="status"
 						aria-label="Status"
 						name="status"
 						value={search.status ?? ""}
-						className="h-8 rounded-md border border-input bg-surface-inset px-2 text-sm"
+						className="h-10 w-full rounded-xl border border-input bg-background/65 px-3 text-sm shadow-inner outline-none transition-[border-color,box-shadow] focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
 						onChange={(event) =>
 							void navigate({
 								search: {
@@ -148,7 +165,7 @@ function DevicesPage() {
 					</Button>
 				)}
 			</div>
-			<div className="overflow-hidden rounded-md border bg-card">
+			<div className="overflow-hidden rounded-2xl border border-border/70 bg-card/80 shadow-[0_1px_2px_rgb(0_0_0/0.06),0_18px_50px_rgb(0_0_0/0.06)]">
 				{data.devices.length ? (
 					<DevicesTable devices={data.devices} />
 				) : (
@@ -167,32 +184,37 @@ function DevicesPage() {
 						</EmptyHeader>
 					</Empty>
 				)}
+				<footer className="flex flex-wrap items-center justify-between gap-3 border-t border-border/70 bg-surface-footer/60 px-4 py-3 text-sm">
+					<p className="text-muted-foreground">
+						{data.total} {data.total === 1 ? "device" : "devices"} · Page{" "}
+						{search.page} of {pages}
+					</p>
+					<div className="flex gap-2">
+						<Button
+							variant="outline"
+							disabled={search.page <= 1}
+							onClick={() =>
+								void navigate({
+									search: { ...search, page: search.page - 1 },
+								})
+							}
+						>
+							Previous
+						</Button>
+						<Button
+							variant="outline"
+							disabled={search.page >= pages}
+							onClick={() =>
+								void navigate({
+									search: { ...search, page: search.page + 1 },
+								})
+							}
+						>
+							Next
+						</Button>
+					</div>
+				</footer>
 			</div>
-			<footer className="flex flex-wrap items-center justify-between gap-3 text-sm">
-				<p className="text-muted-foreground">
-					{data.total} devices · Page {search.page} of {pages}
-				</p>
-				<div className="flex gap-2">
-					<Button
-						variant="outline"
-						disabled={search.page <= 1}
-						onClick={() =>
-							void navigate({ search: { ...search, page: search.page - 1 } })
-						}
-					>
-						Previous
-					</Button>
-					<Button
-						variant="outline"
-						disabled={search.page >= pages}
-						onClick={() =>
-							void navigate({ search: { ...search, page: search.page + 1 } })
-						}
-					>
-						Next
-					</Button>
-				</div>
-			</footer>
 		</div>
 	);
 }

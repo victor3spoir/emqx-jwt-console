@@ -131,12 +131,15 @@ export function DevicesTable({ devices }: { devices: DeviceDto[] }) {
 		getRowId: (row) => row.id,
 	});
 	return (
-		<Table>
-			<TableHeader>
+		<Table className="table-fixed">
+			<TableHeader className="bg-muted/45">
 				{table.getHeaderGroups().map((group) => (
 					<TableRow key={group.id}>
 						{group.headers.map((header) => (
-							<TableHead key={header.id}>
+							<TableHead
+								key={header.id}
+								className={columnClassName(header.column.id)}
+							>
 								{!header.isPlaceholder && <table.FlexRender header={header} />}
 							</TableHead>
 						))}
@@ -145,9 +148,12 @@ export function DevicesTable({ devices }: { devices: DeviceDto[] }) {
 			</TableHeader>
 			<TableBody>
 				{table.getRowModel().rows.map((row) => (
-					<TableRow key={row.id}>
+					<TableRow key={row.id} className="group">
 						{row.getAllCells().map((cell) => (
-							<TableCell key={cell.id}>
+							<TableCell
+								key={cell.id}
+								className={columnClassName(cell.column.id)}
+							>
 								<table.FlexRender cell={cell} />
 							</TableCell>
 						))}
@@ -156,4 +162,23 @@ export function DevicesTable({ devices }: { devices: DeviceDto[] }) {
 			</TableBody>
 		</Table>
 	);
+}
+
+function columnClassName(columnId: string) {
+	switch (columnId) {
+		case "deviceId":
+			return "w-[34%] min-w-40";
+		case "status":
+			return "w-24";
+		case "mqttUsername":
+			return "hidden w-[24%] md:table-cell";
+		case "productModel":
+			return "hidden w-[22%] lg:table-cell";
+		case "lastTokenIssuedAt":
+			return "hidden w-40 xl:table-cell";
+		case "actions":
+			return "w-48 text-right";
+		default:
+			return undefined;
+	}
 }

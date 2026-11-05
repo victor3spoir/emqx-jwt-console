@@ -1,4 +1,11 @@
-// use prisma-8
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
 
 model User {
   id            String    @id
@@ -6,12 +13,12 @@ model User {
   email         String    @unique
   emailVerified Boolean   @default(false)
   image         String?
-  createdAt     TimestamptzJsDate(6) @onCreate(now())
-  updatedAt     TimestamptzJsDate(6) @onCreate(now()) @onUpdate(now())
+  createdAt     DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt     DateTime  @updatedAt @db.Timestamptz(6)
   role          String?   @default("user")
   banned        Boolean?  @default(false)
   banReason     String?
-  banExpires    TimestamptzJsDate(6)?
+  banExpires    DateTime? @db.Timestamptz(6)
   sessions      Session[]
   accounts      Account[]
 
@@ -20,10 +27,10 @@ model User {
 
 model Session {
   id             String   @id
-  expiresAt      TimestamptzJsDate(6)
+  expiresAt      DateTime @db.Timestamptz(6)
   token          String   @unique
-  createdAt      TimestamptzJsDate(6) @onCreate(now())
-  updatedAt      TimestamptzJsDate(6) @onCreate(now()) @onUpdate(now())
+  createdAt      DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @db.Timestamptz(6)
   ipAddress      String?
   userAgent      String?
   userId         String
@@ -42,12 +49,12 @@ model Account {
   accessToken           String?
   refreshToken          String?
   idToken               String?
-  accessTokenExpiresAt  TimestamptzJsDate(6)?
-  refreshTokenExpiresAt TimestamptzJsDate(6)?
+  accessTokenExpiresAt  DateTime? @db.Timestamptz(6)
+  refreshTokenExpiresAt DateTime? @db.Timestamptz(6)
   scope                 String?
   password              String?
-  createdAt             TimestamptzJsDate(6) @onCreate(now())
-  updatedAt             TimestamptzJsDate(6) @onCreate(now()) @onUpdate(now())
+  createdAt             DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt             DateTime  @updatedAt @db.Timestamptz(6)
   user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([providerId, accountId])
@@ -59,9 +66,9 @@ model Verification {
   id         String   @id
   identifier String
   value      String
-  expiresAt  TimestamptzJsDate(6)
-  createdAt  TimestamptzJsDate(6) @onCreate(now())
-  updatedAt  TimestamptzJsDate(6) @onCreate(now()) @onUpdate(now())
+  expiresAt  DateTime @db.Timestamptz(6)
+  createdAt  DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt  DateTime @updatedAt @db.Timestamptz(6)
 
   @@index([identifier])
   @@map("verifications")
@@ -83,30 +90,30 @@ enum DeviceStatus {
 }
 
 model Device {
-  id                Uuid         @id @onCreate(uuid())
-  deviceId          VarChar(100) @unique @map("device_id")
-  serialNumber      VarChar(100) @unique @map("serial_number")
-  mqttUsername      VarChar(100) @unique @map("mqtt_username")
+  id                String       @id @default(uuid()) @db.Uuid
+  deviceId          String       @unique @map("device_id") @db.VarChar(100)
+  serialNumber      String       @unique @map("serial_number") @db.VarChar(100)
+  mqttUsername      String       @unique @map("mqtt_username") @db.VarChar(100)
   deviceSecretHash  String       @map("device_secret_hash")
   deviceSecret      String       @map("device_secret")
   status            DeviceStatus @default(active)
-  firmwareVersion   VarChar(50)?  @map("firmware_version")
-  productModel      VarChar(100)? @map("product_model")
-  createdAt         TimestamptzJsDate(6)  @onCreate(now()) @map("created_at")
-  lastTokenIssuedAt TimestamptzJsDate(6)? @map("last_token_issued_at")
-  revokedAt         TimestamptzJsDate(6)? @map("revoked_at")
+  firmwareVersion   String?      @map("firmware_version") @db.VarChar(50)
+  productModel      String?      @map("product_model") @db.VarChar(100)
+  createdAt         DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  lastTokenIssuedAt DateTime?    @map("last_token_issued_at") @db.Timestamptz(6)
+  revokedAt         DateTime?    @map("revoked_at") @db.Timestamptz(6)
 
   @@index([status, createdAt])
   @@map("devices")
 }
 
 model AuditEvent {
-  id         Uuid     @id @onCreate(uuid())
+  id         String   @id @default(uuid()) @db.Uuid
   actorId    String?  @map("actor_id")
   action     String
   resourceId String?  @map("resource_id")
   outcome    String
-  createdAt  TimestamptzJsDate(6) @onCreate(now()) @map("created_at")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
   @@index([createdAt])
   @@index([resourceId, createdAt])

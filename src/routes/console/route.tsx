@@ -22,29 +22,35 @@ export const Route = createFileRoute("/console")({
 function ConsoleLayout() {
 	const { session } = Route.useRouteContext();
 	return (
-		<div className="min-h-dvh">
-			<header className="flex flex-wrap items-center justify-between gap-4 border-b bg-card px-6 py-4">
-				<Link to="/" className="font-heading text-lg text-primary">
+		<div className="min-h-dvh bg-[radial-gradient(circle_at_top_right,color-mix(in_oklab,var(--ring)_8%,transparent),transparent_32rem)]">
+			<header className="sticky top-0 z-40 flex min-h-16 flex-wrap items-center justify-between gap-3 border-b border-border/70 bg-background/80 px-5 py-3 backdrop-blur-xl supports-[backdrop-filter]:bg-background/70 md:px-6">
+				<Link
+					to="/"
+					className="font-heading text-lg font-semibold tracking-[-0.02em] text-primary"
+				>
 					EMQX Device Console
 				</Link>
-				<div className="flex items-center gap-4">
+				<div className="flex items-center gap-2.5">
 					<ThemeToggle />
-					<span className="text-sm text-muted-foreground">{session.name}</span>
+					<span className="hidden text-sm font-medium text-muted-foreground sm:inline">
+						{session.name}
+					</span>
 					<SignOutButton />
 				</div>
 			</header>
 			<div className="mx-auto grid max-w-screen-2xl md:grid-cols-[200px_1fr]">
 				<nav
 					aria-label="Console"
-					className="flex flex-col gap-1 border-b bg-sidebar p-4 md:min-h-[calc(100dvh-81px)] md:border-r md:border-b-0"
+					className="flex flex-col gap-1.5 border-b border-sidebar-border/70 bg-sidebar/75 p-3 backdrop-blur-xl md:sticky md:top-16 md:h-[calc(100dvh-4rem)] md:border-r md:border-b-0 md:p-4"
 				>
 					<Link
 						to="/console/devices"
 						search={{ search: "", status: undefined, page: 1 }}
-						className="block rounded-md px-3 py-2 text-sm font-medium text-sidebar-foreground hover:bg-sidebar-accent"
+						className="block rounded-xl px-3 py-2.5 text-sm font-medium text-sidebar-foreground transition-[transform,background-color,color,box-shadow] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-[0.98] hover:bg-sidebar-accent/70"
 						activeOptions={{ includeSearch: false }}
 						activeProps={{
-							className: "bg-sidebar-accent text-sidebar-accent-foreground",
+							className:
+								"bg-sidebar-accent text-sidebar-accent-foreground shadow-sm ring-1 ring-sidebar-border/60",
 							"aria-current": "page",
 						}}
 					>
@@ -53,17 +59,18 @@ function ConsoleLayout() {
 					<Link
 						to="/console/audit"
 						search={{ search: "", outcome: undefined, page: 1 }}
-						className="block rounded-md px-3 py-2 text-sm font-medium text-sidebar-foreground hover:bg-sidebar-accent"
+						className="block rounded-xl px-3 py-2.5 text-sm font-medium text-sidebar-foreground transition-[transform,background-color,color,box-shadow] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-[0.98] hover:bg-sidebar-accent/70"
 						activeOptions={{ includeSearch: false }}
 						activeProps={{
-							className: "bg-sidebar-accent text-sidebar-accent-foreground",
+							className:
+								"bg-sidebar-accent text-sidebar-accent-foreground shadow-sm ring-1 ring-sidebar-border/60",
 							"aria-current": "page",
 						}}
 					>
 						Audit log
 					</Link>
 				</nav>
-				<main id="main" className="min-w-0 p-6 md:p-8">
+				<main id="main" className="min-w-0 p-5 md:p-8 lg:p-10">
 					<Outlet />
 				</main>
 			</div>
