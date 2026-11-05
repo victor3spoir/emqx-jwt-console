@@ -7,6 +7,16 @@ This combine backend api & admin dashboard to manage devices that will connect t
 - Admin user to register and manages new devices infos in the the db
 - Devices to challenges and get jwt access token
 
+## Stacks
+
+- bun/bunx: packages mananger
+- prisma/postgres: orm and db management
+- shadcn/tailwindcss@v4: for ui/ux
+- upfetch: for external api clients & calls
+- tanstack-query: for all data fetch operations
+- tanstack-table: for rich tables with rich features
+- tanstast-form: for rich forms operations
+
 ## Spaces Layouts
 
 This give app layouts & structure
