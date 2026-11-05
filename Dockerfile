@@ -23,8 +23,9 @@ WORKDIR /usr/app
 ENV NODE_ENV=production \
   PORT=3000 \
   HOST=0.0.0.0
+COPY --from=builder --chown=bun:bun /usr/app/package.json /usr/app/bun.lock ./
+RUN bun install --frozen-lockfile --production
 COPY --from=builder --chown=bun:bun /usr/app/.output ./.output
-COPY --from=builder --chown=bun:bun /usr/app/package.json ./
 # for prisma migration
 COPY --from=builder --chown=bun:bun /usr/app/prisma ./prisma
 COPY --from=builder --chown=bun:bun /usr/app/prisma.config.ts ./

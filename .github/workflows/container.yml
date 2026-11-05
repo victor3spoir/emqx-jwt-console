@@ -43,7 +43,7 @@ jobs:
 
       - name: Generate image metadata
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
@@ -54,11 +54,13 @@ jobs:
             type=sha,prefix=sha-
 
       - name: Build and publish image
-        uses: docker/build-push-action@v6
+        uses: docker/bake-action@v7
         with:
-          context: .
+          files: |
+            ./docker-bake.hcl
+            cwd://${{ steps.meta.outputs.bake-file }}
+          targets: app
           push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          set: |
+            app.cache-from=type=gha
+            app.cache-to=type=gha,mode=max
