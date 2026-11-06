@@ -1,6 +1,3 @@
--- CreateSchema
-CREATE SCHEMA IF NOT EXISTS "public";
-
 -- CreateEnum
 CREATE TYPE "DeviceStatus" AS ENUM ('active', 'disabled', 'revoked');
 
@@ -84,6 +81,7 @@ CREATE TABLE "devices" (
     "serial_number" VARCHAR(100) NOT NULL,
     "mqtt_username" VARCHAR(100) NOT NULL,
     "device_secret_hash" TEXT NOT NULL,
+    "device_secret" TEXT NOT NULL,
     "status" "DeviceStatus" NOT NULL DEFAULT 'active',
     "firmware_version" VARCHAR(50),
     "product_model" VARCHAR(100),

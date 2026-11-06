@@ -6,7 +6,6 @@ import { Pool } from "pg";
 import { createORPCClient } from "@orpc/client";
 import { RPCLink } from "@orpc/client/fetch";
 import { jwtVerify } from "jose";
-import { hashPassword } from "better-auth/crypto";
 import { PrismaClient } from "../src/generated/prisma/client.ts";
 import { PrismaPg } from "@prisma/adapter-pg";
 
@@ -60,11 +59,10 @@ try {
   }
   assert.ok(ready, "Server did not become ready");
   passed("built application boot and auth health endpoint");
-  for (const path of ["/", "/signin"]) assert.equal((await fetch(`${origin}${path}`)).status, 200);
-  for (const path of ["/signup", "/signup/"]) assert.equal((await fetch(`${origin}${path}`)).status, 404);
+  for (const path of ["/", "/signin", "/signup", "/signup/"]) assert.equal((await fetch(`${origin}${path}`)).status, 200);
   const signinHtml = await (await fetch(`${origin}/signin`)).text();
-  assert.ok(!signinHtml.includes("Create an account"));
-  assert.ok(!signinHtml.includes('href="/signup'));
+  assert.ok(signinHtml.includes("Create an account"));
+  assert.ok(signinHtml.includes('href="/signup'));
   assert.ok(signinHtml.includes("Continue with Keycloak"));
   assert.ok(signinHtml.includes("Keycloak is not configured in this environment."));
   const consoleResponse = await fetch(`${origin}/console`, { redirect: "manual" });
@@ -77,25 +75,16 @@ try {
   assert.match(await darkPage.text(), /<html[^>]*class="dark"/);
   passed("saved theme is server-rendered and invalid preferences default to dark");
   const forgedSignup = await authPost("sign-up/email", { name: "Forged", email: "forged@example.test", password, role: "admin" });
-  assert.equal(forgedSignup.status, 400);
-  assert.equal((await forgedSignup.json()).code, "EMAIL_PASSWORD_SIGN_UP_DISABLED");
-  assert.equal(await prisma.user.count({ where: { email: "forged@example.test" } }), 0);
+  assert.equal(forgedSignup.status, 200);
+  assert.equal((await prisma.user.findUniqueOrThrow({ where: { email: "forged@example.test" } })).role, "user");
   const memberSignup = await authPost("sign-up/email", { name: "Member", email: "member@example.test", password });
-  assert.equal(memberSignup.status, 400);
-  assert.equal((await memberSignup.json()).code, "EMAIL_PASSWORD_SIGN_UP_DISABLED");
+  assert.equal(memberSignup.status, 200);
+  const memberCookie = cookieOf(memberSignup);
   const anonymousCreate = await authPost("admin/create-user", { name: "Unauthorized", email: "unauthorized@example.test", password, role: "admin" });
   assert.equal(anonymousCreate.status, 401);
-  assert.equal(await prisma.user.count(), 1);
-  passed("signup pages removed and public account creation denied without creating users");
-  // Provision an ordinary-user fixture privately to retain authorization coverage.
-  const memberId = randomUUID();
-  const member = await prisma.user.create({ data: {
-    id: memberId, name: "Member", email: "member@example.test", role: "user",
-    accounts: { create: { id: randomUUID(), accountId: memberId, providerId: "credential", password: await hashPassword(password) } },
-  } });
-  const memberSignIn = await authPost("sign-in/email", { email: member.email, password });
-  assert.equal(memberSignIn.status, 200);
-  const memberCookie = cookieOf(memberSignIn);
+  assert.equal(await prisma.user.count(), 3);
+  passed("development signup creates ordinary users and ignores forged roles");
+  const member = await prisma.user.findUniqueOrThrow({ where: { email: "member@example.test" } });
   assert.equal(member.role, "user");
   assert.equal((await rpc(memberCookie).session({})).isAdmin, false);
   const memberCreate = await fetch(`${origin}/api/auth/admin/create-user`, {

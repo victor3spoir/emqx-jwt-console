@@ -7,15 +7,21 @@ This combine backend api & admin dashboard to manage devices that will connect t
 - Admin user to register and manages new devices infos in the the db
 - Devices to challenges and get jwt access token
 
-## Stacks
+## Technology Stack
 
-- bun/bunx: packages mananger
-- prisma/postgres: orm and db management
-- shadcn/tailwindcss@v4: for ui/ux
-- upfetch: for external api clients & calls
-- tanstack-query: for all data fetch operations
-- tanstack-table: for rich tables with rich features
-- tanstast-form: for rich forms operations
+- **Bun and Bunx:** JavaScript runtime, package manager, and project script runner for local development and builds.
+- **React 19 and TanStack Start:** Full-stack application framework for server-rendered React pages, server routes, and production builds.
+- **TanStack Router:** File-based, type-safe routing for public, authentication, and administrator pages.
+- **TanStack Query:** Client-side server-state fetching, caching, invalidation, and mutation coordination.
+- **TanStack Form and Zod:** Type-safe form state and validation for user and device inputs.
+- **TanStack Table:** Headless table behavior for device and audit-log listing, filtering, sorting, and pagination.
+- **oRPC and Zod:** Type-safe application APIs with validated inputs and outputs shared between the server and client.
+- **Better Auth and Keycloak:** Local email/password authentication in development and Keycloak-based identity in production, with role-based administrator access.
+- **Prisma ORM and PostgreSQL:** Persistent storage, schema management, migrations, and type-safe database access.
+- **JOSE:** Signing device JWTs used to authenticate MQTT connections to EMQX.
+- **Tailwind CSS v4, shadcn, and Radix UI:** Styling, design tokens, and accessible interface primitives.
+- **Vite and Nitro:** Development server and frontend bundling through Vite, with Nitro packaging the production server.
+- **TypeScript and Biome:** Static type checking, formatting, and linting.
 
 ## Spaces Layouts
 

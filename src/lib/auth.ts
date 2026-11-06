@@ -63,7 +63,7 @@ export const auth = betterAuth({
 	}),
 	emailAndPassword: {
 		enabled: config.AUTH_EMAIL_PASSWORD_ENABLED,
-		disableSignUp: true,
+		disableSignUp: !config.AUTH_EMAIL_PASSWORD_ENABLED,
 		minPasswordLength: 12,
 	},
 	account: {
@@ -83,6 +83,7 @@ export const auth = betterAuth({
 		max: 60,
 		customRules: {
 			"/sign-in/email": { window: 60, max: 5 },
+			"/sign-up/email": { window: 60, max: 5 },
 		},
 	},
 	advanced: {

@@ -16,6 +16,7 @@ import { Route as ForbiddenRouteImport } from './routes/forbidden'
 import { Route as ApiSplatRouteImport } from './routes/api.$'
 import { Route as ConsoleIndexRouteImport } from './routes/console/index'
 import { Route as AuthSigninIndexRouteImport } from './routes/_auth/signin/index'
+import { Route as AuthSignupIndexRouteImport } from './routes/_auth/signup/index'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as ApiRpcSplatRouteImport } from './routes/api.rpc.$'
 import { Route as ConsoleAuditIndexRouteImport } from './routes/console/audit/index'
@@ -55,6 +56,11 @@ const AuthSigninIndexRoute = AuthSigninIndexRouteImport.update({
   path: '/signin/',
   getParentRoute: () => AuthRouteRoute,
 } as any)
+const AuthSignupIndexRoute = AuthSignupIndexRouteImport.update({
+  id: '/signup/',
+  path: '/signup/',
+  getParentRoute: () => AuthRouteRoute,
+} as any)
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   id: '/api/auth/$',
   path: '/api/auth/$',
@@ -85,6 +91,7 @@ export interface FileRoutesByFullPath {
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/rpc/$': typeof ApiRpcSplatRoute
   '/signin/': typeof AuthSigninIndexRoute
+  '/signup/': typeof AuthSignupIndexRoute
   '/console/audit/': typeof ConsoleAuditIndexRoute
   '/console/devices/': typeof ConsoleDevicesIndexRoute
 }
@@ -96,6 +103,7 @@ export interface FileRoutesByTo {
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/rpc/$': typeof ApiRpcSplatRoute
   '/signin': typeof AuthSigninIndexRoute
+  '/signup': typeof AuthSignupIndexRoute
   '/console/audit': typeof ConsoleAuditIndexRoute
   '/console/devices': typeof ConsoleDevicesIndexRoute
 }
@@ -110,6 +118,7 @@ export interface FileRoutesById {
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/rpc/$': typeof ApiRpcSplatRoute
   '/_auth/signin/': typeof AuthSigninIndexRoute
+  '/_auth/signup/': typeof AuthSignupIndexRoute
   '/console/audit/': typeof ConsoleAuditIndexRoute
   '/console/devices/': typeof ConsoleDevicesIndexRoute
 }
@@ -124,6 +133,7 @@ export interface FileRouteTypes {
     | '/api/auth/$'
     | '/api/rpc/$'
     | '/signin/'
+    | '/signup/'
     | '/console/audit/'
     | '/console/devices/'
   fileRoutesByTo: FileRoutesByTo
@@ -135,6 +145,7 @@ export interface FileRouteTypes {
     | '/api/auth/$'
     | '/api/rpc/$'
     | '/signin'
+    | '/signup'
     | '/console/audit'
     | '/console/devices'
   id:
@@ -148,6 +159,7 @@ export interface FileRouteTypes {
     | '/api/auth/$'
     | '/api/rpc/$'
     | '/_auth/signin/'
+    | '/_auth/signup/'
     | '/console/audit/'
     | '/console/devices/'
   fileRoutesById: FileRoutesById
@@ -213,6 +225,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthSigninIndexRouteImport
       parentRoute: typeof AuthRouteRoute
     }
+    '/_auth/signup/': {
+      id: '/_auth/signup/'
+      path: '/signup'
+      fullPath: '/signup/'
+      preLoaderRoute: typeof AuthSignupIndexRouteImport
+      parentRoute: typeof AuthRouteRoute
+    }
     '/api/auth/$': {
       id: '/api/auth/$'
       path: '/api/auth/$'
@@ -246,10 +265,12 @@ declare module '@tanstack/react-router' {
 
 interface AuthRouteRouteChildren {
   AuthSigninIndexRoute: typeof AuthSigninIndexRoute
+  AuthSignupIndexRoute: typeof AuthSignupIndexRoute
 }
 
 const AuthRouteRouteChildren: AuthRouteRouteChildren = {
   AuthSigninIndexRoute: AuthSigninIndexRoute,
+  AuthSignupIndexRoute: AuthSignupIndexRoute,
 }
 
 const AuthRouteRouteWithChildren = AuthRouteRoute._addFileChildren(

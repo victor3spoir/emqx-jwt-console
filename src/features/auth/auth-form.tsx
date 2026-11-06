@@ -1,6 +1,6 @@
 import { useForm } from "@tanstack/react-form";
 import { useQueryClient } from "@tanstack/react-query";
-import { useRouter } from "@tanstack/react-router";
+import { Link, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -26,9 +26,10 @@ type AuthFormProps = {
 		keycloak: boolean;
 		password: boolean;
 	};
+	mode?: "sign-in" | "sign-up";
 };
 
-export function AuthForm({ capabilities }: AuthFormProps) {
+export function AuthForm({ capabilities, mode = "sign-in" }: AuthFormProps) {
 	const router = useRouter();
 	const queryClient = useQueryClient();
 	const [visible, setVisible] = useState(false);
@@ -52,23 +53,43 @@ export function AuthForm({ capabilities }: AuthFormProps) {
 	};
 
 	const form = useForm({
-		defaultValues: { email: "", password: "" },
+		defaultValues: { name: "", email: "", password: "" },
 		validators: {
-			onSubmit: z.object({
-				email: z.email().max(254),
-				password: z.string().min(1).max(128),
-			}),
+			onSubmit:
+				mode === "sign-up"
+					? z.object({
+							name: z.string().trim().min(1).max(100),
+							email: z.email().max(254),
+							password: z.string().min(12).max(128),
+						})
+					: z.object({
+							name: z.string(),
+							email: z.email().max(254),
+							password: z.string().min(1).max(128),
+						}),
 		},
 		onSubmit: async ({ value }) => {
 			try {
-				const result = await authClient.signIn.email(value);
+				const result =
+					mode === "sign-up"
+						? await authClient.signUp.email(value)
+						: await authClient.signIn.email({
+								email: value.email,
+								password: value.password,
+							});
 				if (result.error) {
 					toast.error(
-						"Unable to sign in. Check your credentials or try again later.",
+						mode === "sign-up"
+							? "Unable to create the account. Check the details or try again later."
+							: "Unable to sign in. Check your credentials or try again later.",
 					);
 					return;
 				}
-				toast.success("Signed in successfully.");
+				toast.success(
+					mode === "sign-up"
+						? "Account created successfully."
+						: "Signed in successfully.",
+				);
 				queryClient.clear();
 				await router.invalidate();
 				await router.navigate({ to: "/console" });
@@ -80,30 +101,40 @@ export function AuthForm({ capabilities }: AuthFormProps) {
 	return (
 		<Card className="w-full max-w-sm">
 			<CardHeader>
-				<CardTitle>Sign in</CardTitle>
-				<CardDescription>Manage your EMQX device fleet.</CardDescription>
+				<CardTitle>
+					{mode === "sign-up" ? "Create account" : "Sign in"}
+				</CardTitle>
+				<CardDescription>
+					{mode === "sign-up"
+						? "Create a local development account."
+						: "Manage your EMQX device fleet."}
+				</CardDescription>
 			</CardHeader>
 			<CardContent>
-				<Button
-					type="button"
-					className="w-full"
-					disabled={!capabilities.keycloak || keycloakPending}
-					onClick={handleKeycloakSignIn}
-				>
-					{keycloakPending ? "Redirecting…" : "Continue with Keycloak"}
-				</Button>
-				{!capabilities.keycloak && (
+				{mode === "sign-in" && (
+					<Button
+						type="button"
+						className="w-full"
+						disabled={!capabilities.keycloak || keycloakPending}
+						onClick={handleKeycloakSignIn}
+					>
+						{keycloakPending ? "Redirecting…" : "Continue with Keycloak"}
+					</Button>
+				)}
+				{mode === "sign-in" && !capabilities.keycloak && (
 					<p className="mt-2 text-center text-xs text-muted-foreground">
 						Keycloak is not configured in this environment.
 					</p>
 				)}
-				{capabilities.keycloak && capabilities.password && (
-					<div className="my-6 flex items-center gap-3 text-xs text-muted-foreground">
-						<div className="h-px flex-1 bg-border" />
-						<span>Development access</span>
-						<div className="h-px flex-1 bg-border" />
-					</div>
-				)}
+				{mode === "sign-in" &&
+					capabilities.keycloak &&
+					capabilities.password && (
+						<div className="my-6 flex items-center gap-3 text-xs text-muted-foreground">
+							<div className="h-px flex-1 bg-border" />
+							<span>Development access</span>
+							<div className="h-px flex-1 bg-border" />
+						</div>
+					)}
 				{capabilities.password && (
 					<form
 						onSubmit={(event) => {
@@ -112,14 +143,21 @@ export function AuthForm({ capabilities }: AuthFormProps) {
 						}}
 					>
 						<FieldGroup>
-							{(["email", "password"] as const).map((name) => (
+							{(mode === "sign-up"
+								? (["name", "email", "password"] as const)
+								: (["email", "password"] as const)
+							).map((name) => (
 								<form.Field key={name} name={name}>
 									{(field) => {
 										const invalid = field.state.meta.errors.length > 0;
 										return (
 											<Field data-invalid={invalid}>
 												<FieldLabel htmlFor={name}>
-													{name === "email" ? "Email" : "Password"}
+													{name === "email"
+														? "Email"
+														: name === "password"
+															? "Password"
+															: "Name"}
 												</FieldLabel>
 												<Input
 													id={name}
@@ -129,12 +167,24 @@ export function AuthForm({ capabilities }: AuthFormProps) {
 															? visible
 																? "text"
 																: "password"
-															: "email"
+															: name === "email"
+																? "email"
+																: "text"
 													}
 													autoComplete={
-														name === "password" ? "current-password" : name
+														name === "password"
+															? mode === "sign-up"
+																? "new-password"
+																: "current-password"
+															: name
 													}
-													maxLength={name === "password" ? 128 : 254}
+													maxLength={
+														name === "password"
+															? 128
+															: name === "email"
+																? 254
+																: 100
+													}
 													required
 													value={field.state.value}
 													onBlur={field.handleBlur}
@@ -169,12 +219,27 @@ export function AuthForm({ capabilities }: AuthFormProps) {
 							<form.Subscribe selector={(state) => state.isSubmitting}>
 								{(pending) => (
 									<Button type="submit" disabled={pending}>
-										{pending ? "Please wait…" : "Sign in"}
+										{pending
+											? "Please wait…"
+											: mode === "sign-up"
+												? "Create account"
+												: "Sign in"}
 									</Button>
 								)}
 							</form.Subscribe>
 						</FieldGroup>
 					</form>
+				)}
+				{capabilities.password && (
+					<p className="mt-5 text-center text-sm text-muted-foreground">
+						{mode === "sign-up" ? "Already have an account?" : "New here?"}{" "}
+						<Link
+							to={mode === "sign-up" ? "/signin" : "/signup"}
+							className="font-medium text-primary hover:underline"
+						>
+							{mode === "sign-up" ? "Sign in" : "Create an account"}
+						</Link>
+					</p>
 				)}
 			</CardContent>
 		</Card>
